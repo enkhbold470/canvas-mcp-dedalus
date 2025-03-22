@@ -67,24 +67,4 @@ GEMINI_API_KEY=your_gemini_api_key
 - Get your Canvas API key from your Canvas LMS account settings
 - Get your Gemini API key from https://aistudio.google.com/app/apikey
 
-## API Usage
-
-```python
-from canvas import get_courses, find_resources, get_modules, get_module_items
-
-# Get all courses
-courses = await get_courses()
-
-# Find resources relevant to a query
-resources = await find_resources("What is the meaning of life?")
-
-# Get modules for a course
-modules = await get_modules("course_id")
-
-# Get items in a module
-items = await get_module_items("course_id", "module_id")
-```
-
----
-
 Built by [Aryan Keluskar](https://aryankeluskar.com) :)
