@@ -21,27 +21,11 @@ Canvas MCP is a set of tools that allows your AI agents to interact with Canvas 
 
 ## Usage
 
-Add the following to your `mcp.json` or `claude_desktop_config.json` file:
+Note down the following beforehand:
+1. Canvas API Key from `Canvas > Account > Settings > Approved Integrations > New Access Token`
+2. Gemini API key from https://aistudio.google.com/app/apikey
 
-```json
-{
-  "mcpServers": {
-      "canvas": {
-          "command": "uv",
-          "args": [
-              "--directory",
-              "/Users/aryank/Developer/canvas-mcp",
-              "run",
-              "canvas.py"
-          ]
-      }
-  }
-}
-```
-
-## Installation
-
-### Installing via Smithery
+### Installing via Smithery (**Preferred**)
 
 To install Canvas MCP for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@aryankeluskar/canvas-mcp):
 
@@ -49,7 +33,16 @@ To install Canvas MCP for Claude Desktop automatically via [Smithery](https://sm
 npx -y @smithery/cli install @aryankeluskar/canvas-mcp --client claude
 ```
 
-### Manual Installation
+Or, for Cursor IDE to use canvas-mcp with other models:
+
+```bash
+npx -y @smithery/cli install @aryankeluskar/canvas-mcp --client cursor
+```
+
+
+
+### Manual Installation (ONLY for local instances)
+
 Download the repository and run the following commands:
 
 ```bash
@@ -75,7 +68,24 @@ CANVAS_API_KEY=your_canvas_api_key
 GEMINI_API_KEY=your_gemini_api_key
 ```
 
-- Get your Canvas API key from your Canvas LMS account settings
-- Get your Gemini API key from https://aistudio.google.com/app/apikey
+Add the following to your `mcp.json` or `claude_desktop_config.json` file:
+
+```json
+{
+  "mcpServers": {
+      "canvas": {
+          "command": "uv",
+          "args": [
+              "--directory",
+              "/Users/aryank/Developer/canvas-mcp",
+              "run",
+              "canvas.py"
+          ]
+      }
+  }
+}
+```
+
+---
 
 Built by [Aryan Keluskar](https://aryankeluskar.com) :)
