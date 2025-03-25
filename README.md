@@ -39,6 +39,7 @@ Or, for Cursor IDE to use canvas-mcp with other models:
 npx -y @smithery/cli install @aryankeluskar/canvas-mcp --client cursor
 ```
 
+---
 
 
 ### Manual Installation (ONLY for local instances)
