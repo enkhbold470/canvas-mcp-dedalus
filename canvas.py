@@ -36,7 +36,8 @@ cache = {
     "file_urls": {},
     "course_analysis": {},
     "module_analysis": {},
-    "resource_analysis": {}
+    "resource_analysis": {},
+    "assignments": {}  # Add assignments cache
 }
 
 # Cache expiration times (in seconds)
@@ -47,7 +48,8 @@ CACHE_TTL = {
     "file_urls": 3600,  # 1 hour
     "course_analysis": 7200,  # 2 hours
     "module_analysis": 7200,  # 2 hours
-    "resource_analysis": 7200  # 2 hours
+    "resource_analysis": 7200,  # 2 hours
+    "assignments": 1800  # 30 minutes
 }
 
 cache_timestamps = {
@@ -57,7 +59,8 @@ cache_timestamps = {
     "file_urls": {},
     "course_analysis": {},
     "module_analysis": {},
-    "resource_analysis": {}
+    "resource_analysis": {},
+    "assignments": {}  # Add assignments timestamps
 }
 
 def cache_get(cache_type, key=None):
@@ -977,9 +980,159 @@ async def helper_resources(query, image_path=None):
         print(f"No relevant resources found for query: {query}")
         return [{"error": "No relevant resources found", "query": query, "course": course_name}]
 
+@mcp.tool()
+async def get_course_assignments(course_id: str, bucket: str = None):
+    """Get all assignments for a specific course, optionally filtered by bucket.
+    
+    Args:
+        course_id: The Canvas course ID
+        bucket: Optional filter - past, overdue, undated, ungraded, unsubmitted, upcoming, future
+    """
+    # Check cache first
+    cache_key = f"{course_id}_{bucket if bucket else 'all'}"
+    cached_assignments = cache_get("assignments", cache_key)
+    if cached_assignments:
+        print(f"Using cached assignments for course {course_id}")
+        return cached_assignments
+
+    try:
+        # Build URL with optional bucket parameter
+        url = f"https://canvas.asu.edu/api/v1/courses/{course_id}/assignments"
+        params = {
+            "order_by": "due_at",
+            "per_page": 100,  # Get max assignments per page
+            "include[]": ["submission", "all_dates"]  # Include submission details
+        }
+        if bucket:
+            params["bucket"] = bucket
+            
+        # Check if API key is available
+        api_key = os.getenv('CANVAS_API_KEY')
+        if not api_key:
+            print("Error: CANVAS_API_KEY environment variable not set")
+            return None
+            
+        headers = {
+            "Authorization": f"Bearer {api_key}"
+        }
+        
+        # Add timeout to prevent hanging
+        response = requests.get(url, headers=headers, params=params, timeout=10)
+        
+        # Check response status
+        if response.status_code != 200:
+            print(f"Error: Canvas API returned status code {response.status_code}")
+            print(f"Response: {response.text}")
+            return None
+            
+        assignments = response.json()
+        
+        # Store in cache
+        cache_set("assignments", assignments, cache_key)
+
+        # only return "id", "description", "due_at", "has_submitted_submissions" and "name" of the assignments
+        return [{"id": assignment["id"], "description": assignment["description"], "due_at": assignment["due_at"], "has_submitted_submissions": assignment["has_submitted_submissions"], "name": assignment["name"]} for assignment in assignments]
+
+
+    except Exception as e:
+        import traceback, sys
+        print(f"Unexpected error in get_course_assignments: {e}")
+        print(f"Line number: {sys.exc_info()[-1].tb_lineno}")
+        print(traceback.format_exc())
+        return None
+
+@mcp.tool()
+async def get_assignments_by_course_name(course_name: str, bucket: str = None):
+    """Get all assignments for a course by its name.
+    
+    Args:
+        course_name: The exact name of the course as it appears in Canvas
+        bucket: Optional filter - past, overdue, undated, ungraded, unsubmitted, upcoming, future
+    """
+    try:
+        # First get all courses to find the course ID
+        courses = await get_courses()
+        if not courses:
+            print("Error: Could not fetch courses")
+            return None
+        
+        course_found = False
+
+        for courseName, courseId in courses.items():
+            if course_name in courseName:
+                course_id = courseId
+                course_found = True
+                break
+            
+        # Find the course ID by name
+        if not course_found:
+            print(f"Error: Course '{course_name}' not found")
+            print(f"Available courses: {list(courses.keys())}")
+            return None
+            
+        # Get assignments using the course ID
+        return await get_course_assignments(course_id, bucket)
+        
+    except Exception as e:
+        import traceback, sys
+        print(f"Unexpected error in get_assignments_by_course_name: {e}")
+        print(f"Line number: {sys.exc_info()[-1].tb_lineno}")
+        print(traceback.format_exc())
+        return None
+
+# Add test functions
+async def test_assignments():
+    """Test the assignment functions"""
+    print("\nTesting assignment functions...")
+    
+    # Test get_course_assignments
+    print("\nTesting get_course_assignments...")
+    courses = await get_courses()
+    if courses:
+        first_course_id = next(iter(courses.values()))
+        print(f"Testing with first course ID: {first_course_id}")
+        
+        # Test without bucket
+        assignments = await get_course_assignments(first_course_id)
+        print(f"Found {len(assignments) if assignments else 0} assignments without bucket")
+        
+        # Test with bucket
+        upcoming = await get_course_assignments(first_course_id, "upcoming")
+        print(f"Found {len(upcoming) if upcoming else 0} upcoming assignments")
+    
+    # Test get_assignments_by_course_name
+    print("\nTesting get_assignments_by_course_name...")
+    if courses:
+        first_course_name = next(iter(courses.keys()))
+        print(f"Testing with first course name: {first_course_name}")
+        
+        # Test without bucket
+        assignments = await get_assignments_by_course_name(first_course_name)
+        print(f"Found {len(assignments) if assignments else 0} assignments without bucket")
+        
+        # Test with bucket
+        upcoming = await get_assignments_by_course_name(first_course_name, "upcoming")
+        print(f"Found {len(upcoming) if upcoming else 0} upcoming assignments")
+
+# Update run_tests to include assignment tests
 async def run_tests():
+    # Existing tests
     out = await find_resources(query="what would be the best resources to learn dot product of matrices from canvas?")
     print(out)
+
+    print("="*50)
+    
+    # Add assignment tests
+    await test_assignments()
+
+    print("="*50)
+
+    # Get assignments for Linear Algebra
+    assignments = await get_assignments_by_course_name("Linear Algebra")
+    print(assignments)
+
+    with open("assignments.json", "w") as f:
+        json.dump(assignments, f)
 
 
 if __name__ == "__main__":
