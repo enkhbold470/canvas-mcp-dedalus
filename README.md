@@ -1,5 +1,7 @@
 # Canvas MCP
 
+[![smithery badge](https://smithery.ai/badge/@aryankeluskar/canvas-mcp)](https://smithery.ai/server/@aryankeluskar/canvas-mcp)
+
 Canvas MCP is a set of tools that allows your AI agents to interact with Canvas LMS.
 
 ![example](example.png)
@@ -39,6 +41,15 @@ Add the following to your `mcp.json` or `claude_desktop_config.json` file:
 
 ## Installation
 
+### Installing via Smithery
+
+To install Canvas MCP for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@aryankeluskar/canvas-mcp):
+
+```bash
+npx -y @smithery/cli install @aryankeluskar/canvas-mcp --client claude
+```
+
+### Manual Installation
 Download the repository and run the following commands:
 
 ```bash
