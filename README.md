@@ -59,7 +59,7 @@ uv pip install -r requirements.txt
 pip install -r requirements.txt
 ```
 
-## Configuration
+### Manual Configuration
 
 Create a `.env` file in the root directory with the following environment variables:
 
