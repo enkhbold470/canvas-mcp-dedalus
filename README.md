@@ -9,12 +9,13 @@ Canvas MCP is a set of tools that allows your AI agents to interact with Canvas 
 ## Features
 
 - **Find relevant resources** - Ability to find relevant resources for a given query in natural language!
+- **Query upcoming assignments** - Not only fetch upcoming assignments, but also provide its breakdown for a given course.
 - Get courses
 - Get modules
 - Get module items
 - Get file url
-- Get calendar events (coming soon)
-- Get assignments (coming soon)
+- Get calendar events
+- Get assignments
 - Get course analysis (coming soon)
 - Get module analysis (coming soon)
 - Get resource analysis (coming soon)
