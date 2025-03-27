@@ -9,11 +9,11 @@ startCommand:
       canvasApiKey:
         type: string
         default: ""
-        description: Canvas API key for accessing the Canvas LMS API
+        description: Canvas API key for accessing your courses. Found in "Canvas > Account > Settings > Approved Integrations > New Access Token"
       googleApiKey:
         type: string
         default: ""
-        description: Google API key for Gemini services
+        description: Google API key for Gemini services found at https://aistudio.google.com/app/apikey
   commandFunction:
     # A JS function that produces the CLI command based on the given config to start the MCP on stdio.
     |-
