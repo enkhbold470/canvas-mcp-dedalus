@@ -25,7 +25,8 @@ Canvas MCP is a set of tools that allows your AI agents to interact with Canvas 
 Note down the following beforehand:
 1. Canvas API Key from `Canvas > Account > Settings > Approved Integrations > New Access Token`
 2. Gemini API key from https://aistudio.google.com/app/apikey
-
+3. Gradescope Email and Password https://www.gradescope.com/
+   
 ### Installing via Smithery (**Preferred**)
 
 To install Canvas MCP for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@aryankeluskar/canvas-mcp):
