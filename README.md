@@ -40,6 +40,12 @@ Or, for Cursor IDE to use canvas-mcp with other models:
 npx -y @smithery/cli install @aryankeluskar/canvas-mcp --client cursor
 ```
 
+Or, for Windsurf:
+
+```bash
+npx -y @smithery/cli install @aryankeluskar/canvas-mcp --client windsurf
+```
+
 ---
 
 
