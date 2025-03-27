@@ -5,19 +5,19 @@ import json
 import requests
 import base64
 import google.generativeai as genai
-from pathlib import Path
 import mimetypes
-import functools
 import time
-from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Optional, Dict, List
-import httpx
 from mcp.server.fastmcp import FastMCP
+from gradescopeapi.classes.connection import GSConnection
+# Import gradescope functions from gradescope.py
+import gradescope
+from datetime import datetime
 
 import sys
 
 # Initialize FastMCP server
-mcp = FastMCP("canvas")
+mcp = FastMCP("canvas_and_gradescope")
 
 # Print Gemini API version for debugging
 try:
@@ -1080,6 +1080,15 @@ async def get_assignments_by_course_name(course_name: str, bucket: str = None):
         print(traceback.format_exc())
         return None
 
+# @mcp.tool()
+# async def get_gradescope_course_by_name(course_name: str):
+#     """Get a course from Gradescope by name"""
+#     courses = await get_gradescope_courses()
+#     for course in courses["student"].values():
+#         if course_name in course["name"] or course_name in course["full_name"]:
+#             return course
+#     return None
+
 # Add test functions
 async def test_assignments():
     """Test the assignment functions"""
@@ -1114,7 +1123,328 @@ async def test_assignments():
         upcoming = await get_assignments_by_course_name(first_course_name, "upcoming")
         print(f"Found {len(upcoming) if upcoming else 0} upcoming assignments")
 
-# Update run_tests to include assignment tests
+# Add MCP tools for Gradescope
+
+@mcp.tool()
+async def get_canvas_courses():
+    """Get all Canvas courses for the current user"""
+    return await get_courses()
+
+@mcp.tool()
+async def get_gradescope_courses(random_string: str = ""):
+    """Get all Gradescope courses for the current user"""
+    return gradescope._get_gradescope_courses()
+
+@mcp.tool()
+async def get_gradescope_course_by_name(course_name: str):
+    """Find a Gradescope course by name (partial match supported)
+    
+    Args:
+        course_name: The name of the course to search for
+    """
+    return gradescope.get_course_by_name(course_name)
+
+@mcp.tool()
+async def get_gradescope_assignments(course_id: str):
+    """Get all Gradescope assignments for a specific course
+    
+    Args:
+        course_id: The Gradescope course ID
+    """
+    return gradescope.get_assignments_for_course(course_id)
+
+@mcp.tool()
+async def get_gradescope_assignment_by_name(course_id: str, assignment_name: str):
+    """Find a Gradescope assignment by name within a course
+    
+    Args:
+        course_id: The Gradescope course ID
+        assignment_name: The name of the assignment to search for (partial match supported)
+    """
+    return gradescope.get_assignment_by_name(course_id, assignment_name)
+
+@mcp.tool()
+async def get_gradescope_submissions(course_id: str, assignment_id: str):
+    """Get all submissions for a Gradescope assignment
+    
+    Args:
+        course_id: The Gradescope course ID
+        assignment_id: The Gradescope assignment ID
+    """
+    return gradescope.get_assignment_submissions(course_id, assignment_id)
+
+@mcp.tool()
+async def get_gradescope_student_submission(course_id: str, assignment_id: str, student_email: str):
+    """Get a specific student's submission for a Gradescope assignment
+    
+    Args:
+        course_id: The Gradescope course ID
+        assignment_id: The Gradescope assignment ID
+        student_email: The email address of the student
+    """
+    return gradescope.get_student_submission(course_id, assignment_id, student_email)
+
+@mcp.tool()
+async def call_search_gradescope(query: str):
+    """Search for information across Gradescope using natural language
+    
+    Args:
+        query: Natural language query about Gradescope courses, assignments, etc.
+    """
+    # Analyze the query to determine what is being asked
+    analysis = gradescope.analyze_gradescope_query(query)
+    
+    if analysis["type"] == "get_courses":
+        # User is asking about courses
+        courses = gradescope._get_gradescope_courses()
+        if not courses:
+            return {"error": "Could not retrieve Gradescope courses"}
+        return courses
+    
+    elif analysis["type"] == "get_assignments":
+        # User is asking about assignments
+        course_id = analysis.get("course_id")
+        course_name = analysis.get("course_name")
+        
+        # If we don't have a course ID but have a name, try to get the ID
+        if not course_id and course_name:
+            course = gradescope.get_course_by_name(course_name)
+            if course:
+                course_id = course.get("id")
+        
+        # If we still don't have a course ID, return an error
+        if not course_id:
+            # Try to get all courses and return that instead
+            courses = gradescope._get_gradescope_courses()
+            if courses:
+                return {
+                    "message": "Please specify which course you're interested in. Here are your courses:",
+                    "courses": courses
+                }
+            else:
+                return {"error": "Could not determine which course to get assignments for"}
+        
+        # Get assignments for the course
+        assignments = gradescope.get_assignments_for_course(course_id)
+        if not assignments:
+            return {"error": f"No assignments found for the course {course_name or course_id}"}
+        
+        return assignments
+    
+    elif analysis["type"] == "get_submission":
+        # User is asking about a submission
+        course_id = analysis.get("course_id")
+        course_name = analysis.get("course_name")
+        assignment_id = analysis.get("assignment_id")
+        assignment_name = analysis.get("assignment_name")
+        
+        # If we don't have a course ID but have a name, try to get the ID
+        if not course_id and course_name:
+            course = gradescope.get_course_by_name(course_name)
+            if course:
+                course_id = course.get("id")
+        
+        # If we don't have an assignment ID but have a name and course ID, try to get the ID
+        if not assignment_id and assignment_name and course_id:
+            assignment = gradescope.get_assignment_by_name(course_id, assignment_name)
+            if assignment:
+                assignment_id = assignment.id
+        
+        # If we still don't have both IDs, return an error
+        if not course_id or not assignment_id:
+            return {"error": "Could not determine which course or assignment to get submissions for"}
+        
+        # Get submissions for the assignment
+        submissions = gradescope.get_assignment_submissions(course_id, assignment_id)
+        if not submissions:
+            return {"error": f"No submissions found for the assignment {assignment_name or assignment_id}"}
+        
+        return submissions
+    
+    else:
+        # Unknown query type
+        return {
+            "error": "I'm not sure what you're asking about Gradescope. Try asking about your courses, assignments, or submissions."
+        }
+
+# Add tests for Gradescope functions
+async def test_gradescope():
+    """Test the Gradescope functions"""
+    print("\nTesting Gradescope functions...")
+    
+    # Test get_gradescope_courses
+    print("\nTesting get_gradescope_courses...")
+    courses = await get_gradescope_courses()
+    print(f"Found {len(courses['student']) if courses and 'student' in courses else 0} Gradescope courses")
+    
+    if courses and 'student' in courses and len(courses['student']) > 0:
+        # Get a course name from the first course
+        first_course = next(iter(courses['student'].values()))
+        course_name = first_course['name']
+        
+        # Test mcp_get_gradescope_course_by_name
+        print(f"\nTesting mcp_get_gradescope_course_by_name with '{course_name}'...")
+        course = await get_gradescope_course_by_name(course_name)
+        print(f"Found course: {course['name'] if course else None}")
+        
+        if course:
+            course_id = course['id']
+            
+            # Test mcp_get_gradescope_assignments
+            print(f"\nTesting mcp_get_gradescope_assignments for course '{course['name']}'...")
+            assignments = await get_gradescope_assignments(course_id)
+            print(f"Found {len(assignments) if assignments else 0} assignments")
+            
+            if assignments and len(assignments) > 0:
+                # Test with first assignment
+                assignment = assignments[0]
+                print(f"\nTesting with assignment '{assignment.name}'...")
+                
+                # Fix: Access assignment ID correctly - investigate the structure of assignment objects
+                # Print the assignment object structure for debugging
+                print(f"Assignment object attributes: {dir(assignment)}")
+                
+                # Try different ways to access the ID - it might not be directly 'id'
+                assignment_id = getattr(assignment, 'id', None)
+                if assignment_id is None:
+                    # Try to find the ID in other attributes
+                    if hasattr(assignment, 'get_id'):
+                        assignment_id = assignment.get_id()
+                    elif hasattr(assignment, 'assignment_id'):
+                        assignment_id = assignment.assignment_id
+                    # Add more fallbacks if needed
+                
+                if assignment_id:
+                    print(f"Using assignment ID: {assignment_id}")
+                    
+                    # Test mcp_get_gradescope_submissions
+                    print(f"Testing mcp_get_gradescope_submissions...")
+                    submissions = await get_gradescope_submissions(course_id, assignment_id)
+                    print(f"Found submissions: {submissions is not None}")
+                else:
+                    print("Could not determine assignment ID. Skipping submission and extension tests.")
+                
+    # Test natural language search
+    print("\nTesting mcp_search_gradescope...")
+    search_result = await call_search_gradescope("What are my Gradescope courses?")
+    print(f"Search result: {search_result is not None}")
+    
+    search_result2 = await call_search_gradescope("Show me my assignments")
+    print(f"Search result 2: {search_result2 is not None}")
+
+@mcp.tool()
+async def search_education_platforms(query: str):
+    """Search for information across Canvas and Gradescope using natural language
+    
+    Args:
+        query: Natural language query about Canvas courses, Gradescope assignments, etc.
+    """
+    # First, determine if the query is related to Canvas or Gradescope
+    canvas_keywords = ["canvas", "module", "resource", "course page", "page", "learning module", "file", "lecture"]
+    gradescope_keywords = ["gradescope", "assignment", "submission", "grade", "score", "feedback", "due date", "deadline"]
+    
+    # Count matches for each platform
+    canvas_matches = sum(1 for keyword in canvas_keywords if keyword.lower() in query.lower())
+    gradescope_matches = sum(1 for keyword in gradescope_keywords if keyword.lower() in query.lower())
+    
+    # Handle general queries about academics or courses that don't specifically mention a platform
+    if "course" in query.lower() and canvas_matches == 0 and gradescope_matches == 0:
+        # Check both platforms
+        results = {"canvas": {}, "gradescope": {}}
+        
+        # Get Canvas courses
+        try:
+            canvas_courses = await get_courses()
+            if canvas_courses:
+                results["canvas"]["courses"] = canvas_courses
+        except Exception as e:
+            print(f"Error fetching Canvas courses: {e}")
+        
+        # Get Gradescope courses
+        try:
+            gradescope_courses = await get_gradescope_courses()
+            if gradescope_courses:
+                results["gradescope"]["courses"] = gradescope_courses
+        except Exception as e:
+            print(f"Error fetching Gradescope courses: {e}")
+            
+        return {
+            "message": "Here are your courses from both Canvas and Gradescope:",
+            "results": results
+        }
+    
+    # If the query seems more related to Canvas
+    if canvas_matches > gradescope_matches or "canvas" in query.lower():
+        # Use the Canvas resource finder
+        try:
+            resources = await find_resources(query=query)
+            return {
+                "message": "Here are the most relevant Canvas resources for your query:",
+                "source": "Canvas",
+                "resources": resources
+            }
+        except Exception as e:
+            print(f"Error searching Canvas: {e}")
+            return {"error": f"Error searching Canvas: {str(e)}"}
+    
+    # If the query seems more related to Gradescope
+    elif gradescope_matches > canvas_matches or "gradescope" in query.lower():
+        # Use the Gradescope search
+        try:
+            results = await call_search_gradescope(query)
+            return {
+                "message": "Here are the Gradescope results for your query:",
+                "source": "Gradescope",
+                "results": results
+            }
+        except Exception as e:
+            print(f"Error searching Gradescope: {e}")
+            return {"error": f"Error searching Gradescope: {str(e)}"}
+    
+    # If we can't determine which platform, search both
+    else:
+        combined_results = {"canvas": None, "gradescope": None}
+        
+        # Try Canvas first
+        try:
+            canvas_results = await find_resources(query=query)
+            combined_results["canvas"] = canvas_results
+        except Exception as e:
+            print(f"Error searching Canvas: {e}")
+        
+        # Then try Gradescope
+        try:
+            gradescope_results = await call_search_gradescope(query)
+            combined_results["gradescope"] = gradescope_results
+        except Exception as e:
+            print(f"Error searching Gradescope: {e}")
+        
+        return {
+            "message": "Here are results from both Canvas and Gradescope for your query:",
+            "results": combined_results
+        }
+
+# Add a test for the unified search function
+async def test_unified_search():
+    """Test the unified search function"""
+    print("\nTesting unified search...")
+    
+    # Test a Canvas-specific query
+    print("\nTesting Canvas-specific query...")
+    canvas_result = await search_education_platforms("What resources are available for learning matrices in Canvas?")
+    print(f"Canvas search result: {canvas_result is not None}")
+    
+    # Test a Gradescope-specific query
+    print("\nTesting Gradescope-specific query...")
+    gradescope_result = await search_education_platforms("Show me my Gradescope assignments")
+    print(f"Gradescope search result: {gradescope_result is not None}")
+    
+    # Test a general query
+    print("\nTesting general query...")
+    general_result = await search_education_platforms("What courses am I enrolled in?")
+    print(f"General search result: {general_result is not None}")
+
+# Update run_tests to include the unified search test
 async def run_tests():
     # Existing tests
     out = await find_resources(query="what would be the best resources to learn dot product of matrices from canvas?")
@@ -1133,7 +1463,16 @@ async def run_tests():
 
     with open("assignments.json", "w") as f:
         json.dump(assignments, f)
-
+    
+    print("="*50)
+    
+    # Add Gradescope tests
+    await test_gradescope()
+    
+    print("="*50)
+    
+    # Add unified search test
+    await test_unified_search()
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
