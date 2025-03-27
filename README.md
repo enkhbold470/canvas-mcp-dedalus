@@ -4,7 +4,7 @@
 
 Canvas MCP is a set of tools that allows your AI agents to interact with Canvas LMS.
 
-![example](example.png)
+![example](assets/example.png)
 
 ## Features
 
