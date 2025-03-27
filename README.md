@@ -10,15 +10,14 @@ Canvas MCP is a set of tools that allows your AI agents to interact with Canvas 
 
 - **Find relevant resources** - Ability to find relevant resources for a given query in natural language!
 - **Query upcoming assignments** - Not only fetch upcoming assignments, but also provide its breakdown for a given course.
+- **Get courses and assignments from Gradescope** - Query your Gradescope courses and assignments with natural language, get submission status, and more!
 - Get courses
 - Get modules
 - Get module items
 - Get file url
 - Get calendar events
 - Get assignments
-- Get course analysis (coming soon)
-- Get module analysis (coming soon)
-- Get resource analysis (coming soon)
+- and so much more... 
 
 ## Usage
 
