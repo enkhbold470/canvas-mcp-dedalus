@@ -100,6 +100,7 @@ def cache_set(cache_type, value, key=None):
 
 @mcp.tool()
 async def get_courses():
+    """Use this tool to retrieve all available Canvas courses for the current user. This tool returns a dictionary mapping course names to their corresponding IDs. Use this when you need to find course IDs based on names, display all available courses, or when needing to access any course-related information."""
     # Check cache first
     cached_courses = cache_get("courses")
     if cached_courses:
@@ -166,6 +167,7 @@ async def get_courses():
 
 @mcp.tool()
 async def get_modules(course_id):
+    """Use this tool to retrieve all modules within a specific Canvas course. This tool returns a list of module objects containing module details like ID, name, and status. Use this when exploring or navigating course content structure."""
     # Check cache first
     cached_modules = cache_get("modules", course_id)
     if cached_modules:
@@ -224,7 +226,7 @@ async def get_modules(course_id):
 
 @mcp.tool()
 async def get_module_items(course_id, module_id):
-    """Get items within a specific module"""
+    """Use this tool to retrieve all items within a specific module in a Canvas course. This tool returns a list of module item objects containing details like title, type, and URLs. Use this when you need to access specific learning materials, assignments, or other content within a module."""
     # Check cache first
     cache_key = f"{course_id}_{module_id}"
     cached_items = cache_get("module_items", cache_key)
@@ -280,7 +282,7 @@ async def get_module_items(course_id, module_id):
 
 @mcp.tool()
 async def get_file_url(course_id, file_id):
-    """Get the download URL for a file"""
+    """Use this tool to get the direct download URL for a file stored in Canvas. This tool returns a URL string that can be used to access or download the file. Use this when you need direct access to file content rather than just the Canvas page URL."""
     # Check cache first
     cache_key = f"{course_id}_{file_id}"
     cached_url = cache_get("file_urls", cache_key)
@@ -718,7 +720,7 @@ def analyze_resource_relevance(query, resource_items, course_name, module_name):
 
 @mcp.tool()
 async def find_resources(query: str, image_path: Optional[str] = None):
-    """API endpoint to find resources based on a student query or image"""
+    """Use this tool to search for and identify the most relevant learning resources across Canvas courses based on a text query or image. This tool analyzes user needs and returns resources ranked by relevance. Use this when helping users find specific learning materials, lecture notes, or content related to their questions."""
     try:
         print(f"Processing query: {query}, image_path: {image_path}")
         
@@ -982,7 +984,7 @@ async def helper_resources(query, image_path=None):
 
 @mcp.tool()
 async def get_course_assignments(course_id: str, bucket: str = None):
-    """Get all assignments for a specific course, optionally filtered by bucket.
+    """Use this tool to retrieve all assignments for a specific Canvas course, with optional filtering by status. This tool returns assignment details including name, description, due date, and submission status. Use this when helping users manage their coursework, check due dates, or find assignment details.
     
     Args:
         course_id: The Canvas course ID
@@ -1037,10 +1039,10 @@ async def get_course_assignments(course_id: str, bucket: str = None):
 
 @mcp.tool()
 async def get_assignments_by_course_name(course_name: str, bucket: str = None):
-    """Get all assignments for a course by its name.
+    """Use this tool to retrieve all assignments for a Canvas course using its name rather than ID. This tool returns assignment details the same as get_course_assignments. Use this when you have the course name but not the ID, or when helping users find assignments across multiple courses.
     
     Args:
-        course_name: The exact name of the course as it appears in Canvas
+        course_name: The name of the course as it appears in Canvas (partial matches supported)
         bucket: Optional filter - past, overdue, undated, ungraded, unsubmitted, upcoming, future
     """
     try:
@@ -1121,26 +1123,26 @@ async def test_assignments():
 
 @mcp.tool()
 async def get_canvas_courses():
-    """Get all Canvas courses for the current user"""
+    """Use this tool to retrieve all available Canvas courses for the current user. This is an alias for get_courses. Use this when you need to find course IDs based on names or display all available courses."""
     return await get_courses()
 
 @mcp.tool()
 async def get_gradescope_courses(random_string: str = ""):
-    """Get all Gradescope courses for the current user"""
+    """Use this tool to retrieve all available Gradescope courses for the current user. This tool returns a dictionary of courses organized by user role. Use this when helping users access or manage their Gradescope course information."""
     return gradescope._get_gradescope_courses()
 
 @mcp.tool()
 async def get_gradescope_course_by_name(course_name: str):
-    """Find a Gradescope course by name (partial match supported)
+    """Use this tool to find a specific Gradescope course by name (partial matches supported). This tool returns the course object if found. Use this when you need to get course details or ID when only the name is known.
     
     Args:
-        course_name: The name of the course to search for
+        course_name: The name or partial name of the Gradescope course to search for
     """
     return gradescope.get_course_by_name(course_name)
 
 @mcp.tool()
 async def get_gradescope_assignments(course_id: str):
-    """Get all Gradescope assignments for a specific course
+    """Use this tool to retrieve all assignments for a specific Gradescope course. This tool returns a list of assignment objects with details like name, due date, and status. Use this when helping users manage their Gradescope coursework.
     
     Args:
         course_id: The Gradescope course ID
@@ -1149,17 +1151,17 @@ async def get_gradescope_assignments(course_id: str):
 
 @mcp.tool()
 async def get_gradescope_assignment_by_name(course_id: str, assignment_name: str):
-    """Find a Gradescope assignment by name within a course
+    """Use this tool to find a specific Gradescope assignment by name within a course. This tool returns the assignment object if found. Use this when you need assignment details or ID when only the name and course are known.
     
     Args:
         course_id: The Gradescope course ID
-        assignment_name: The name of the assignment to search for (partial match supported)
+        assignment_name: The name or partial name of the assignment to search for
     """
     return gradescope.get_assignment_by_name(course_id, assignment_name)
 
 @mcp.tool()
 async def get_gradescope_submissions(course_id: str, assignment_id: str):
-    """Get all submissions for a Gradescope assignment
+    """Use this tool to retrieve all submissions for a specific Gradescope assignment. This tool returns a list of submission objects with details like submission time and score. Use this when helping users review or manage submission information.
     
     Args:
         course_id: The Gradescope course ID
@@ -1169,18 +1171,18 @@ async def get_gradescope_submissions(course_id: str, assignment_id: str):
 
 @mcp.tool()
 async def get_gradescope_student_submission(course_id: str, assignment_id: str, student_email: str):
-    """Get a specific student's submission for a Gradescope assignment
+    """Use this tool to retrieve a specific student's submission for a Gradescope assignment. This tool returns the submission object if found. Use this when helping a student review their own submission or when an instructor needs details about a specific student's work.
     
     Args:
         course_id: The Gradescope course ID
         assignment_id: The Gradescope assignment ID
-        student_email: The email address of the student
+        student_email: The email address of the student whose submission to retrieve
     """
     return gradescope.get_student_submission(course_id, assignment_id, student_email)
 
 @mcp.tool()
 async def call_search_gradescope(query: str):
-    """Search for information across Gradescope using natural language
+    """Use this tool to search for information across Gradescope using natural language queries. This tool analyzes the query and returns relevant information about courses, assignments, or submissions. Use this when helping users find Gradescope information without knowing specific IDs or technical details.
     
     Args:
         query: Natural language query about Gradescope courses, assignments, etc.
@@ -1328,10 +1330,10 @@ async def test_gradescope():
 
 @mcp.tool()
 async def search_education_platforms(query: str):
-    """Search for information across Canvas and Gradescope using natural language
+    """Use this tool to search for information across both Canvas and Gradescope using natural language queries. This tool determines which platform is most relevant to the query and returns appropriately formatted results. Use this for broad educational queries when the user hasn't specified which platform they're interested in.
     
     Args:
-        query: Natural language query about Canvas courses, Gradescope assignments, etc.
+        query: Natural language query about courses, assignments, or other educational content
     """
     # First, determine if the query is related to Canvas or Gradescope
     canvas_keywords = ["canvas", "module", "resource", "course page", "page", "learning module", "file", "lecture"]
