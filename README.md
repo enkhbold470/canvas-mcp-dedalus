@@ -2,7 +2,9 @@
 
 [![smithery badge](https://smithery.ai/badge/@aryankeluskar/canvas-mcp)](https://smithery.ai/server/@aryankeluskar/canvas-mcp)
 
-Canvas MCP is a set of tools that allows your AI agents to interact with Canvas LMS.
+Canvas MCP is a set of tools that allows your AI agents to interact with Canvas LMS and Gradescope.
+
+![gradescope](assets/gradescope_mcp_ant.png)
 
 ![example](assets/example.png)
 

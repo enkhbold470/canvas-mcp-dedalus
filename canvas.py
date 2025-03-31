@@ -988,12 +988,6 @@ async def get_course_assignments(course_id: str, bucket: str = None):
         course_id: The Canvas course ID
         bucket: Optional filter - past, overdue, undated, ungraded, unsubmitted, upcoming, future
     """
-    # Check cache first
-    cache_key = f"{course_id}_{bucket if bucket else 'all'}"
-    cached_assignments = cache_get("assignments", cache_key)
-    if cached_assignments:
-        print(f"Using cached assignments for course {course_id}")
-        return cached_assignments
 
     try:
         # Build URL with optional bucket parameter
@@ -1028,7 +1022,7 @@ async def get_course_assignments(course_id: str, bucket: str = None):
         assignments = response.json()
         
         # Store in cache
-        cache_set("assignments", assignments, cache_key)
+        # cache_set("assignments", assignments, cache_key)
 
         # only return "id", "description", "due_at", "has_submitted_submissions" and "name" of the assignments
         return [{"id": assignment["id"], "description": assignment["description"], "due_at": assignment["due_at"], "has_submitted_submissions": assignment["has_submitted_submissions"], "name": assignment["name"]} for assignment in assignments]
