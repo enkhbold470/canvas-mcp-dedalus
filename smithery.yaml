@@ -9,18 +9,22 @@ startCommand:
       canvasApiKey:
         type: string
         default: ""
+        secret: true
         description: Canvas API key for accessing your courses. Found in "Canvas > Account > Settings > Approved Integrations > New Access Token"
       googleApiKey:
         type: string
         default: ""
+        secret: true
         description: Google API key for Gemini services found at https://aistudio.google.com/app/apikey
       gradescopeEmail:
         type: string
         default: ""
+        secret: true
         description: Gradescope email for accessing your courses.
       gradescopePassword:
         type: string
         default: ""
+        secret: true
         description: Gradescope password for accessing your courses.
   commandFunction:
     # A JS function that produces the CLI command based on the given config to start the MCP on stdio.
