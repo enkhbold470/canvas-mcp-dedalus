@@ -1,6 +1,7 @@
 future.py
 
 *.json
+ignore.txt
 
 # General
 .DS_Store

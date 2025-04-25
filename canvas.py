@@ -983,13 +983,17 @@ async def helper_resources(query, image_path=None):
         return [{"error": "No relevant resources found", "query": query, "course": course_name}]
 
 @mcp.tool()
-async def get_course_assignments(course_id: str, bucket: str = None):
+async def get_course_assignments(course_id, bucket: str = None):
     """Use this tool to retrieve all assignments for a specific Canvas course, with optional filtering by status. This tool returns assignment details including name, description, due date, and submission status. Use this when helping users manage their coursework, check due dates, or find assignment details.
     
     Args:
         course_id: The Canvas course ID
         bucket: Optional filter - past, overdue, undated, ungraded, unsubmitted, upcoming, future
     """
+
+    # if course_id is not a string, convert it to a string
+    if not isinstance(course_id, str):
+        course_id = str(course_id)
 
     try:
         # Build URL with optional bucket parameter
