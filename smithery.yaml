@@ -15,7 +15,7 @@ startCommand:
         type: string
         default: ""
         hidden: true
-        description: Google API key for Gemini services found at https://aistudio.google.com/app/apikey
+        description: Gemini API key for natural language queries (Get for free at https://aistudio.google.com/app/apikey)
       gradescopeEmail:
         type: string
         default: ""
@@ -26,6 +26,7 @@ startCommand:
         default: ""
         hidden: true
         description: Gradescope password for accessing your courses.
+    required: ["canvasApiKey"]
   commandFunction:
     # A JS function that produces the CLI command based on the given config to start the MCP on stdio.
     |-
