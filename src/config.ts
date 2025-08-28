@@ -15,8 +15,7 @@ export const configSchema = z.object({
   canvasApiKey: z.string().describe("Canvas API key"),
   canvasBaseUrl: z.string().default("https://canvas.asu.edu").describe("Canvas base URL"),
   gradescopeEmail: z.string().optional().describe("Gradescope email"),
-  gradescopePassword: z.string().optional().describe("Gradescope password"),
-  geminiApiKey: z.string().optional().describe("Google Gemini API key for resource discovery")
+  gradescopePassword: z.string().optional().describe("Gradescope password")
 });
 
 export type Config = z.infer<typeof configSchema>;
@@ -30,8 +29,7 @@ export function getConfig(): Config {
     canvasApiKey: process.env.CANVAS_API_KEY || '',
     canvasBaseUrl: process.env.CANVAS_BASE_URL || 'https://canvas.asu.edu',
     gradescopeEmail: process.env.GRADESCOPE_EMAIL,
-    gradescopePassword: process.env.GRADESCOPE_PASSWORD,
-    geminiApiKey: process.env.GEMINI_API_KEY
+    gradescopePassword: process.env.GRADESCOPE_PASSWORD
   };
 
   // Validate required fields
@@ -46,10 +44,10 @@ export function getConfig(): Config {
  * Logger utility with debug mode support
  */
 export class Logger {
-  private debug: boolean;
+  private debugMode: boolean;
 
   constructor(debug: boolean = false) {
-    this.debug = debug;
+    this.debugMode = debug;
   }
 
   log(...args: any[]): void {
@@ -61,7 +59,7 @@ export class Logger {
   }
 
   debug(...args: any[]): void {
-    if (this.debug) {
+    if (this.debugMode) {
       console.log('[Canvas-MCP DEBUG]', ...args);
     }
   }
