@@ -226,9 +226,6 @@ export default function createStatelessServer({
     server.tool(
       "get_gradescope_courses",
       "Use this tool to retrieve all available Gradescope courses for the current user. This tool returns a dictionary of courses organized by user role. Use this when helping users access or manage their Gradescope course information.",
-      {
-        random_string: z.string().default("").describe("Dummy parameter for no-parameter tools")
-      },
       async () => {
         try {
           const courses = await gradescopeApi!.getGradescopeCourses();
@@ -242,31 +239,6 @@ export default function createStatelessServer({
           logger.error("Error in get_gradescope_courses:", error);
           return {
             content: [{ type: "text", text: "Error retrieving Gradescope courses" }]
-          };
-        }
-      }
-    );
-
-    // Tool 9: Get Gradescope course by name
-    server.tool(
-      "get_gradescope_course_by_name",
-      "Use this tool to find a specific Gradescope course by name (partial matches supported). This tool returns the course object if found. Use this when you need to get course details or ID when only the name is known.",
-      {
-        course_name: z.string().describe("The name or partial name of the Gradescope course to search for")
-      },
-      async ({ course_name }) => {
-        try {
-          const course = await gradescopeApi!.getGradescopeCourseByName(course_name);
-          return {
-            content: [{ 
-              type: "text", 
-              text: course ? JSON.stringify(course, null, 2) : "Course not found"
-            }]
-          };
-        } catch (error) {
-          logger.error("Error in get_gradescope_course_by_name:", error);
-          return {
-            content: [{ type: "text", text: "Error retrieving Gradescope course" }]
           };
         }
       }
