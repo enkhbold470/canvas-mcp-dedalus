@@ -10,12 +10,7 @@ startCommand:
         type: string
         default: ""
         hidden: true
-        description: Canvas API key for accessing your courses. Found in "Canvas > Account > Settings > Approved Integrations > New Access Token"
-      googleApiKey:
-        type: string
-        default: ""
-        hidden: true
-        description: Gemini API key for natural language queries (Get for free at https://aistudio.google.com/app/apikey)
+        description: Canvas Access Token for accessing your courses. Found in "Canvas > Account > Settings > Approved Integrations > New Access Token"
       gradescopeEmail:
         type: string
         default: ""
@@ -35,13 +30,11 @@ startCommand:
       args: ['canvas.py'],
       env: {
         CANVAS_API_KEY: config.canvasApiKey,
-        GOOGLE_API_KEY: config.googleApiKey,
         GRADESCOPE_EMAIL: config.gradescopeEmail,
         GRADESCOPE_PASSWORD: config.gradescopePassword
       }
     })
   exampleConfig:
     canvasApiKey: your_canvas_api_key
-    googleApiKey: your_google_api_key
     gradescopeEmail: your_gradescope_email
     gradescopePassword: your_gradescope_password
