@@ -1,22 +1,28 @@
 {
-	"name": "smithery-scaffold",
-	"version": "1.0.0",
-	"description": "",
+	"name": "canvas-mcp",
+	"version": "1.0.1",
+	"description": "The MCP for everything EdTech. This is a collection of Canvas LMS tools for the model context protocol, which allows you to query your courses and get help for your assignments in the AI app of your choice. Try now!",
 	"main": "index.js",
 	"module": "./src/index.ts",
 	"type": "module",
 	"scripts": {
-		"dev": "npx @smithery/cli dev"
+		"dev": "npx @smithery/cli dev",
+		"build": "tsx src/index.ts",
+		"start": "node dist/index.js"
 	},
-	"keywords": [],
-	"author": "",
+	"keywords": ["mcp", "canvas", "gradescope", "education", "lms"],
+	"author": "Aryan Keluskar",
 	"license": "ISC",
 	"dependencies": {
 		"@modelcontextprotocol/sdk": "^1.12.1",
-		"zod": "^3.25.46"
+		"zod": "^3.25.46",
+		"node-fetch": "^3.3.2",
+		"dotenv": "^16.4.5",
+		"node-cache": "^5.1.2"
 	},
 	"devDependencies": {
 		"@smithery/cli": "^1.2.4",
-		"tsx": "^4.19.4"
+		"tsx": "^4.19.4",
+		"@types/node": "^20.11.24"
 	}
 }
