@@ -61,6 +61,7 @@ interface ModuleItem {
   file_content_type?: string;
   file_content_size?: number;
   file_content_truncated?: boolean;
+  is_public_link?: boolean; // True when file_url is a public link instead of downloaded content
 }
 
 interface Assignment {
@@ -108,6 +109,9 @@ export class CanvasApi {
 
       this.config.logger.debug(`Making Canvas API request to: ${url}`);
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -115,8 +119,10 @@ export class CanvasApi {
           'Accept': 'application/json',
           'User-Agent': 'Canvas-MCP-JS/1.0'
         },
-        timeout: 10000
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         this.config.logger.error(`Canvas API error: ${response.status} ${response.statusText}`);
@@ -304,16 +310,36 @@ export class CanvasApi {
 
   /**
    * Download and process file content for module items
+   * For PDFs, provides public links instead of downloading content
    */
   private async downloadFileContent(item: ModuleItem, fileUrl: string): Promise<void> {
     try {
-      // First try HEAD request to check size
+      // First try HEAD request to check content type and size
+      const headController = new AbortController();
+      const headTimeoutId = setTimeout(() => headController.abort(), 10000);
+      
       const headResponse = await fetch(fileUrl, { 
         method: 'HEAD',
-        timeout: 10000
+        signal: headController.signal
       });
+      
+      clearTimeout(headTimeoutId);
 
+      let contentType = '';
       if (headResponse.ok) {
+        contentType = headResponse.headers.get('content-type') || '';
+        
+        // For PDFs, just provide the public URL instead of downloading content
+        if (contentType === 'application/pdf' || fileUrl.toLowerCase().endsWith('.pdf')) {
+          item.file_content_type = contentType || 'application/pdf';
+          item.file_url = fileUrl;
+          item.file_content_truncated = false;
+          // Add a flag to indicate this is a public link
+          item.is_public_link = true;
+          this.config.logger.debug(`Providing public link for PDF: ${fileUrl}`);
+          return;
+        }
+
         const contentLength = headResponse.headers.get('content-length');
         if (contentLength && parseInt(contentLength) > MAX_CONTENT_BYTES) {
           item.file_content_truncated = true;
@@ -321,15 +347,22 @@ export class CanvasApi {
         }
       }
 
-      // GET the content
-      const response = await fetch(fileUrl, { timeout: 20000 });
+      // GET the content for non-PDF files
+      const downloadController = new AbortController();
+      const downloadTimeoutId = setTimeout(() => downloadController.abort(), 20000);
+      
+      const response = await fetch(fileUrl, { 
+        signal: downloadController.signal
+      });
+      
+      clearTimeout(downloadTimeoutId);
       if (!response.ok) {
         this.config.logger.warn(`Could not download file content, status ${response.status}`);
         return;
       }
 
       const buffer = await response.buffer();
-      const contentType = response.headers.get('content-type') || '';
+      contentType = response.headers.get('content-type') || contentType;
       
       item.file_content_type = contentType;
       item.file_content_size = buffer.length;
