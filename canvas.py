@@ -226,7 +226,13 @@ async def get_modules(course_id):
 
 @mcp.tool()
 async def get_module_items(course_id, module_id):
-    """Use this tool to retrieve all items within a specific module in a Canvas course. This tool returns a list of module item objects containing details like title, type, and URLs. Use this when you need to access specific learning materials, assignments, or other content within a module."""
+    """Use this tool to retrieve all items within a specific module in a Canvas course.
+    This now enriches File-type items with a direct download URL and (size-limited) file contents.
+
+    Returns a list of module item objects containing details like title, type, Canvas URLs,
+    and, for File items, `file_url`, `file_meta`, and optionally `file_content_text` and/or
+    `file_content_base64` (content download limited by size and type).
+    """
     # Check cache first
     cache_key = f"{course_id}_{module_id}"
     cached_items = cache_get("module_items", cache_key)
@@ -262,7 +268,97 @@ async def get_module_items(course_id, module_id):
             print(f"Warning: No items found for module {module_id} in course {course_id}")
             return None
             
-        # Store in cache
+        # Enrich File-type items with direct file URLs and (size-limited) contents
+        MAX_CONTENT_BYTES = 5 * 1024 * 1024  # 5 MB cap to avoid huge downloads
+        for item in items:
+            try:
+                if item.get("type") == "File" and "content_id" in item:
+                    file_id = item["content_id"]
+
+                    # Resolve direct file URL (with cache)
+                    file_cache_key = f"{course_id}_{file_id}"
+                    file_url = cache_get("file_urls", file_cache_key)
+
+                    if not file_url:
+                        file_meta_url = f"https://canvas.asu.edu/api/v1/courses/{course_id}/files/{file_id}"
+                        api_key = os.getenv('CANVAS_API_KEY')
+                        if not api_key:
+                            print("Error: CANVAS_API_KEY environment variable not set")
+                            continue
+                        file_headers = {
+                            "Authorization": f"Bearer {api_key}"
+                        }
+                        meta_resp = requests.get(file_meta_url, headers=file_headers, timeout=10)
+                        if meta_resp.status_code != 200:
+                            print(f"Error: Canvas API returned status {meta_resp.status_code} for file metadata {file_id}")
+                            continue
+                        file_data = meta_resp.json()
+                        # Prefer 'url' if present
+                        file_url = file_data.get('url') or file_data.get('download_url') or None
+
+                        # Attach minimal metadata
+                        item["file_meta"] = {
+                            "display_name": file_data.get("display_name"),
+                            "filename": file_data.get("filename"),
+                            "size": file_data.get("size"),
+                            "content_type": file_data.get("content-type") or file_data.get("content_type"),
+                        }
+
+                        if file_url:
+                            cache_set("file_urls", file_url, file_cache_key)
+                    else:
+                        item["file_meta"] = item.get("file_meta", {})
+
+                    if file_url:
+                        item["file_url"] = file_url
+
+                        # Try to download file content, respecting size and type
+                        try:
+                            # First attempt a HEAD to check size (may not always work); fallback to GET
+                            head_resp = requests.head(file_url, allow_redirects=True, timeout=10)
+                            content_length = head_resp.headers.get("Content-Length") if head_resp is not None else None
+                            if content_length is not None and content_length.isdigit():
+                                if int(content_length) > MAX_CONTENT_BYTES:
+                                    item["file_content_truncated"] = True
+                                    continue
+
+                            # GET content
+                            file_resp = requests.get(file_url, allow_redirects=True, timeout=20)
+                            if file_resp.status_code == 200:
+                                content_bytes = file_resp.content
+                                content_type = file_resp.headers.get("Content-Type", "")
+                                item["file_content_type"] = content_type
+                                item["file_content_size"] = len(content_bytes)
+
+                                if len(content_bytes) > MAX_CONTENT_BYTES:
+                                    item["file_content_truncated"] = True
+                                    # Keep first MAX_CONTENT_BYTES bytes
+                                    content_bytes = content_bytes[:MAX_CONTENT_BYTES]
+                                else:
+                                    item["file_content_truncated"] = False
+
+                                # If text-like, attach decoded text; always attach base64
+                                if content_type.startswith("text/") or content_type in ("application/json", "application/xml"):
+                                    try:
+                                        # Use response encoding if provided
+                                        encoding = file_resp.encoding or "utf-8"
+                                        item["file_content_text"] = content_bytes.decode(encoding, errors="replace")
+                                    except Exception:
+                                        # Fallback to utf-8 replace
+                                        item["file_content_text"] = content_bytes.decode("utf-8", errors="replace")
+
+                                item["file_content_base64"] = base64.b64encode(content_bytes).decode("utf-8")
+                            else:
+                                print(f"Warning: Could not download file content for {file_id}, status {file_resp.status_code}")
+                        except requests.RequestException as e:
+                            print(f"Warning: RequestException while downloading file content: {e}")
+                        except Exception as e:
+                            print(f"Warning: Unexpected error while handling file content: {e}")
+            except Exception as e:
+                print(f"Warning: Failed to enrich file item: {e}")
+                continue
+
+        # Store enriched items in cache
         cache_set("module_items", items, cache_key)
             
         return items
@@ -717,45 +813,7 @@ def analyze_resource_relevance(query, resource_items, course_name, module_name):
         print(f"Line number: {sys.exc_info()[-1].tb_lineno}")
         print(traceback.format_exc())
         return None
-
-@mcp.tool()
-async def find_resources(query: str, image_path: Optional[str] = None):
-    """Use this tool to search for and identify the most relevant learning resources across Canvas courses based on a text query or image. This tool analyzes user needs and returns resources ranked by relevance. Use this when helping users find specific learning materials, lecture notes, or content related to their questions."""
-    try:
-        print(f"Processing query: {query}, image_path: {image_path}")
-        
-        # Validate inputs
-        if not query and not image_path:
-            return {"error": "Either query or image_path must be provided"}
-            
-        # Check if image path exists when provided
-        if image_path and not os.path.exists(image_path):
-            print(f"Warning: Image path does not exist: {image_path}")
-            if not query:
-                return {"error": "Image path provided does not exist and no query was provided"}
-        
-        # Call helper_resources with proper error handling
-        result = await helper_resources(query, image_path)
-        if not result:
-            return {"error": "Failed to find resources", "message": "Resource search returned no results"}
-            
-        # Check if result indicates an error
-        if isinstance(result, list) and len(result) > 0 and "error" in result[0]:
-            return result[0]
-            
-        return result
-        
-    except Exception as e:
-        # Log the error
-        import traceback, sys
-        error_msg = f"Error processing request: {str(e)}"
-        line_num = sys.exc_info()[-1].tb_lineno
-        print(f"{error_msg} at line {line_num}")
-        print(traceback.format_exc())
-        
-        # Return a proper error response
-        return {"error": "Internal server error", "message": str(e), "line": line_num}
-
+    
 async def process_module(course_id, module, query, course_name):
     """Process a single module and return relevant resources"""
     module_id = module["id"]
@@ -789,8 +847,6 @@ async def process_module(course_id, module, query, course_name):
     
     # Add the relevant resources to our results
     relevant_resources = []
-    file_url_tasks = []
-    
     for idx_pos, idx in enumerate(relevant_indices):
         if idx < len(items):
             item = items[idx]
@@ -798,22 +854,20 @@ async def process_module(course_id, module, query, course_name):
             resource = {
                 "title": item.get("title", "Untitled Resource"),
                 "type": item.get("type", "Unknown"),
-                "url": item.get("html_url", ""),
+                "url": item.get("file_url") or item.get("html_url", ""),
                 "course": course_name,
                 "module": module_name,
                 "relevance_score": relevance_scores[idx_pos] if idx_pos < len(relevance_scores) else 0.5,
-                "item": item  # Save the original item for file URL resolution
+                # Surface file enrichment if present
+                "file_meta": item.get("file_meta"),
+                "file_content_type": item.get("file_content_type"),
+                "file_content_size": item.get("file_content_size"),
+                "file_content_truncated": item.get("file_content_truncated"),
+                "file_content_text": item.get("file_content_text"),
+                "file_content_base64": item.get("file_content_base64"),
             }
             
             relevant_resources.append(resource)
-    
-    # Process file URLs in parallel
-    for resource in relevant_resources:
-        item = resource.pop("item")  # Remove the item from the resource
-        if item.get("type") == "File" and "content_id" in item:
-            file_url = await get_file_url(course_id, item["content_id"])
-            if file_url:
-                resource["url"] = file_url
     
     return relevant_resources
 
@@ -1332,126 +1386,8 @@ async def test_gradescope():
     search_result2 = await call_search_gradescope("Show me my assignments")
     print(f"Search result 2: {search_result2 is not None}")
 
-@mcp.tool()
-async def search_education_platforms(query: str):
-    """Use this tool to search for information across both Canvas and Gradescope using natural language queries. This tool determines which platform is most relevant to the query and returns appropriately formatted results. Use this for broad educational queries when the user hasn't specified which platform they're interested in.
-    
-    Args:
-        query: Natural language query about courses, assignments, or other educational content
-    """
-    # First, determine if the query is related to Canvas or Gradescope
-    canvas_keywords = ["canvas", "module", "resource", "course page", "page", "learning module", "file", "lecture"]
-    gradescope_keywords = ["gradescope", "assignment", "submission", "grade", "score", "feedback", "due date", "deadline"]
-    
-    # Count matches for each platform
-    canvas_matches = sum(1 for keyword in canvas_keywords if keyword.lower() in query.lower())
-    gradescope_matches = sum(1 for keyword in gradescope_keywords if keyword.lower() in query.lower())
-    
-    # Handle general queries about academics or courses that don't specifically mention a platform
-    if "course" in query.lower() and canvas_matches == 0 and gradescope_matches == 0:
-        # Check both platforms
-        results = {"canvas": {}, "gradescope": {}}
-        
-        # Get Canvas courses
-        try:
-            canvas_courses = await get_courses()
-            if canvas_courses:
-                results["canvas"]["courses"] = canvas_courses
-        except Exception as e:
-            print(f"Error fetching Canvas courses: {e}")
-        
-        # Get Gradescope courses
-        try:
-            gradescope_courses = await get_gradescope_courses()
-            if gradescope_courses:
-                results["gradescope"]["courses"] = gradescope_courses
-        except Exception as e:
-            print(f"Error fetching Gradescope courses: {e}")
-            
-        return {
-            "message": "Here are your courses from both Canvas and Gradescope:",
-            "results": results
-        }
-    
-    # If the query seems more related to Canvas
-    if canvas_matches > gradescope_matches or "canvas" in query.lower():
-        # Use the Canvas resource finder
-        try:
-            resources = await find_resources(query=query)
-            return {
-                "message": "Here are the most relevant Canvas resources for your query:",
-                "source": "Canvas",
-                "resources": resources
-            }
-        except Exception as e:
-            print(f"Error searching Canvas: {e}")
-            return {"error": f"Error searching Canvas: {str(e)}"}
-    
-    # If the query seems more related to Gradescope
-    elif gradescope_matches > canvas_matches or "gradescope" in query.lower():
-        # Use the Gradescope search
-        try:
-            results = await call_search_gradescope(query)
-            return {
-                "message": "Here are the Gradescope results for your query:",
-                "source": "Gradescope",
-                "results": results
-            }
-        except Exception as e:
-            print(f"Error searching Gradescope: {e}")
-            return {"error": f"Error searching Gradescope: {str(e)}"}
-    
-    # If we can't determine which platform, search both
-    else:
-        combined_results = {"canvas": None, "gradescope": None}
-        
-        # Try Canvas first
-        try:
-            canvas_results = await find_resources(query=query)
-            combined_results["canvas"] = canvas_results
-        except Exception as e:
-            print(f"Error searching Canvas: {e}")
-        
-        # Then try Gradescope
-        try:
-            gradescope_results = await call_search_gradescope(query)
-            combined_results["gradescope"] = gradescope_results
-        except Exception as e:
-            print(f"Error searching Gradescope: {e}")
-        
-        return {
-            "message": "Here are results from both Canvas and Gradescope for your query:",
-            "results": combined_results
-        }
-
-# Add a test for the unified search function
-async def test_unified_search():
-    """Test the unified search function"""
-    print("\nTesting unified search...")
-    
-    # Test a Canvas-specific query
-    print("\nTesting Canvas-specific query...")
-    canvas_result = await search_education_platforms("What resources are available for learning matrices in Canvas?")
-    print(f"Canvas search result: {canvas_result is not None}")
-    
-    # Test a Gradescope-specific query
-    print("\nTesting Gradescope-specific query...")
-    gradescope_result = await search_education_platforms("Show me my Gradescope assignments")
-    print(f"Gradescope search result: {gradescope_result is not None}")
-    
-    # Test a general query
-    print("\nTesting general query...")
-    general_result = await search_education_platforms("What courses am I enrolled in?")
-    print(f"General search result: {general_result is not None}")
-
 # Update run_tests to include the unified search test
 async def run_tests():
-    # Existing tests
-    out = await find_resources(query="what would be the best resources to learn dot product of matrices from canvas?")
-    print(out)
-
-    print("="*50)
-    
     # Add assignment tests
     await test_assignments()
 
@@ -1470,9 +1406,6 @@ async def run_tests():
     await test_gradescope()
     
     print("="*50)
-    
-    # Add unified search test
-    await test_unified_search()
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
