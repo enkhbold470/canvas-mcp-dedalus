@@ -31,12 +31,12 @@ USER mcp
 
 # Set environment variables for Lambda Web Adapter
 ENV NODE_ENV=production
-ENV PORT=8000
+ENV PORT=8080
 ENV AWS_LAMBDA_EXEC_WRAPPER=/opt/extensions/lambda-adapter
 
 # Expose port 8000 for the MCP server
-EXPOSE 8000
+EXPOSE 8080
 
 # Command to run the server
 # Use compiled JavaScript for production, with --port flag for HTTP transport
-CMD ["node", "dist/index.js", "--port", "8000"]
+CMD ["node", "dist/index.js", "--port", "8080"]
